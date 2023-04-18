@@ -1160,6 +1160,28 @@ class String(Value):
     
     def __repr__(self):
         return f'"{self.value}"'
+
+# list
+
+class List(Value):
+    def __init__(self, elements):
+        super.__init__()
+        self.elements = elements
+
+    def added_to(self, other):
+        new_list = self.copy()
+        new_list.elements.append(other)
+        return new_list, None
+
+    def multed_by(self, other):
+        if isinstance(other, List):
+            new_list = self.copy()
+            new_list.elements.extend(other)
+            return new_list, None
+        else:
+            return None, Value.illegal_operation(self, other)
+
+
     
 # function
 
