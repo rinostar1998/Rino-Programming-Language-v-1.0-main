@@ -640,11 +640,12 @@ class Parser:
                 element_nodes.append(res.register(self.expr()))
                 if res.error: return res
 
-                if self.current_tok.type != TT_RSQUARE:
-                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected ',' or ']'!!"))
+            if self.current_tok.type != TT_RSQUARE:
+                return res.failure(InvalidSyntaxError(
+                        self.current_tok.pos_start, self.current_tok.pos_end, "Expected ',' or ']'!!"))
                 
-                res.register_advancement()
-                self.advance()
+            res.register_advancement()
+            self.advance()
 
         return res.success(ListNode(element_nodes, pos_start, self.current_tok.pos_end.copy()))
 
@@ -1180,7 +1181,7 @@ class List(Value):
                 return new_list, None
             except:
                 return None, RTError(other.pos_start, other.pos_end, 
-                 "Why are you trying to find a non-existent object that's out of bounds!?!?", self.context)
+                 "Why are you trying to remove a non-existent object that's out of bounds!?!?", self.context)
         else:
             return None, Value.illegal_operation(self, other)
         
@@ -1191,7 +1192,7 @@ class List(Value):
                 return self.elements[other.value], None
             except:
                 return None, RTError(other.pos_start, other.pos_end, 
-                 "Why are you trying to remove a non-existent object that's out of bounds!?!?", self.context)
+                 "Why are you trying to find a non-existent object that's out of bounds!?!?", self.context)
         else:
             return None, Value.illegal_operation(self, other)
 
