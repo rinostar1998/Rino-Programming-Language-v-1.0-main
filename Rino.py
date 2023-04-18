@@ -365,6 +365,13 @@ class StringNode:
     def __repr__(self):
         return f'{self.tok}'
     
+class ListNode:
+    def __init__(self, element_nodes, pos_start, pos_end):
+        self.element_nodes = element_nodes
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+        
+
 class VarAccessNode:
     def __init__(self, var_name_tok):
         self.var_name_tok = var_name_tok
@@ -503,13 +510,152 @@ class Parser:
     
     ####################################################
 
+    def parse(self):
+        res = self.expr()
+        if not res.error and self.current_tok.type != TT_EOF:
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Binary Operator! (Good look with that one!~fufufufufu!~) "))
+        return res
+    
+    def power(self):
+        return self.bin_op(self.call, (TT_POW, ), self.factor)
+
+    def call(self):
+        res = ParseResult()
+        atom = res.register(self.atom())
+        if res.error: return res
+
+        if self.current_tok.type == TT_LPAREN:
+            res.register_advancement()
+            self.advance()
+            arg_nodes = []
+            
+            if self.current_tok.type == TT_RPAREN:
+                res.register_advancement()
+                self.advance()
+            else:
+                arg_nodes.append(res.register(self.expr()))
+                if res.error:
+                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Numbers, Identifier, Variable (var), '+' / '-' operators, left or right parenthesis! "))
+
+                while self.current_tok.type == TT_COMMA:
+                    res.register_advancement()
+                    self.advance()
+
+                    arg_nodes.append(res.register(self.expr()))
+                    if res.error: return res
+
+                if self.current_tok.type != TT_RPAREN:
+                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected ',' or ')'!!"))
+                
+                res.register_advancement()
+                self.advance()
+            return res.success(CallNode(atom, arg_nodes))
+        return res.success(atom)
+
+
+    def atom(self):
+        res = ParseResult()
+        tok = self.current_tok
+
+        if tok.type in (TT_INT, TT_FLOAT):
+            res.register_advancement()
+            self.advance()
+            return res.success(NumberNode(tok))
+        
+        elif tok.type == TT_STRING:
+            res.register_advancement()
+            self.advance()
+            return res.success(StringNode(tok))
+        
+        elif tok.type == TT_IDENTIFIER:
+            res.register_advancement()
+            self.advance()
+            return res.success(VarAccessNode(tok))
+        
+        elif tok.type == TT_LPAREN:
+            res.register_advancement()
+            self.advance()
+            expr = res.register(self.expr())
+            if res.error: return res
+            if self.current_tok.type == TT_RPAREN:
+                res.register_advancement()
+                self.advance()
+                return res.success(expr)
+            else:
+                return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Failed to find the other parenthesis in expr! (HA!)    Hint: (Expected closing Parenthesis!) "))
+
+        elif tok.type == TT_LSQUARE:
+            list_expr = res.register(self.list_expr())
+            if res.error: return res
+            return res.success(list_expr)
+
+        elif tok.matches(TT_KEYWORD, 'if:'):
+            if_expr = res.register(self.if_expr())
+            if res.error: return res
+            return res.success(if_expr)
+        
+        elif tok.matches(TT_KEYWORD, 'for:'):
+            for_expr = res.register(self.for_expr())
+            if res.error: return res
+            return res.success(for_expr)
+        
+        elif tok.matches(TT_KEYWORD, 'while:'):
+            while_expr = res.register(self.while_expr())
+            if res.error: return res
+            return res.success(while_expr)
+        
+        elif tok.matches(TT_KEYWORD, 'fn:'):
+            func_def = res.register(self.func_def())
+            if res.error: return res
+            return res.success(func_def)
+
+        return res.failure(InvalidSyntaxError(
+            tok.pos_start, tok.pos_end, 
+            "Expected Numbers, Identifier, 'if:', 'for:', 'while:', 'fn:', '+' / '-', '[', operators, or left parenthesis!! "))
+    
+    def list_expr(self):
+        res = ParseResult()
+        element_nodes = []
+        pos_start = self.current_tok.pos_start.copy()
+
+        if self.current_tok.type != TT_LSQUARE:
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, 
+            "Expected Starting List Bracket!!"))
+
+        res.register_advancement()
+        self.advance()
+
+        if self.current_tok.type == TT_RSQUARE:
+            res.register_advancement()
+            self.advance()
+        else:
+            element_nodes.append(res.register(self.expr()))
+            if res.error:
+                return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Numbers, Identifier, Variable (var), '+' / '-' operators, left or right square brackets! "))
+
+            while self.current_tok.type == TT_COMMA:
+                res.register_advancement()
+                self.advance()
+
+                element_nodes.append(res.register(self.expr()))
+                if res.error: return res
+
+                if self.current_tok.type != TT_RSQUARE:
+                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected ',' or ']'!!"))
+                
+                res.register_advancement()
+                self.advance()
+
+        return res.success(ListNode(element_nodes, pos_start, self.current_tok.pos_end.copy()))
+
     def if_expr(self):
         res = ParseResult()
         cases = []
         else_case = None
 
         if not self.current_tok.matches(TT_KEYWORD, 'if:'):
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Conditional Statement!!"))
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, 
+            self.current_tok.pos_end, "Expected Conditional Statement!!"))
         
         res.register_advancement()
         self.advance()
@@ -518,7 +664,8 @@ class Parser:
         if res.error: return res
 
         if not self.current_tok.matches(TT_KEYWORD, 'then:'):
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Execution After Conditional Statement!!"))
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, 
+            self.current_tok.pos_end, "Expected Execution After Conditional Statement!!"))
 
         res.register_advancement()
         self.advance()
@@ -627,104 +774,6 @@ class Parser:
 
         return res.success(WhileNode(condition, body))
 
-
-
-    def parse(self):
-        res = self.expr()
-        if not res.error and self.current_tok.type != TT_EOF:
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Binary Operator! (Good look with that one!~fufufufufu!~) "))
-        return res
-    
-    def power(self):
-        return self.bin_op(self.call, (TT_POW, ), self.factor)
-
-    def call(self):
-        res = ParseResult()
-        atom = res.register(self.atom())
-        if res.error: return res
-
-        if self.current_tok.type == TT_LPAREN:
-            res.register_advancement()
-            self.advance()
-            arg_nodes = []
-            
-            if self.current_tok.type == TT_RPAREN:
-                res.register_advancement()
-                self.advance()
-            else:
-                arg_nodes.append(res.register(self.expr()))
-                if res.error:
-                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Numbers, Identifier, Variable (var), '+' / '-' operators, left or right parenthesis! "))
-
-                while self.current_tok.type == TT_COMMA:
-                    res.register_advancement()
-                    self.advance()
-
-                    arg_nodes.append(res.register(self.expr()))
-                    if res.error: return res
-
-                if self.current_tok.type != TT_RPAREN:
-                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected ',' or ')'!!"))
-                
-                res.register_advancement()
-                self.advance()
-            return res.success(CallNode(atom, arg_nodes))
-        return res.success(atom)
-
-
-    def atom(self):
-        res = ParseResult()
-        tok = self.current_tok
-
-        if tok.type in (TT_INT, TT_FLOAT):
-            res.register_advancement()
-            self.advance()
-            return res.success(NumberNode(tok))
-        
-        elif tok.type == TT_STRING:
-            res.register_advancement()
-            self.advance()
-            return res.success(StringNode(tok))
-        
-        elif tok.type == TT_IDENTIFIER:
-            res.register_advancement()
-            self.advance()
-            return res.success(VarAccessNode(tok))
-        
-        elif tok.type == TT_LPAREN:
-            res.register_advancement()
-            self.advance()
-            expr = res.register(self.expr())
-            if res.error: return res
-            if self.current_tok.type == TT_RPAREN:
-                res.register_advancement()
-                self.advance()
-                return res.success(expr)
-            else:
-                return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Failed to find the other parenthesis in expr! (HA!)    Hint: (Expected closing Parenthesis!) "))
-
-        elif tok.matches(TT_KEYWORD, 'if:'):
-            if_expr = res.register(self.if_expr())
-            if res.error: return res
-            return res.success(if_expr)
-        
-        elif tok.matches(TT_KEYWORD, 'for:'):
-            for_expr = res.register(self.for_expr())
-            if res.error: return res
-            return res.success(for_expr)
-        
-        elif tok.matches(TT_KEYWORD, 'while:'):
-            while_expr = res.register(self.while_expr())
-            if res.error: return res
-            return res.success(while_expr)
-        
-        elif tok.matches(TT_KEYWORD, 'fn:'):
-            func_def = res.register(self.func_def())
-            if res.error: return res
-            return res.success(func_def)
-
-        return res.failure(InvalidSyntaxError(tok.pos_start, tok.pos_end, "Expected Numbers, Identifier, 'if:', 'for:', 'while:', 'fn:', '+' / '-' operators, or left parenthesis! "))
-    
     def factor(self):
         res = ParseResult()
         tok = self.current_tok
@@ -759,7 +808,8 @@ class Parser:
         node = res.register(self.bin_op(self.arith_expr, (TT_EE, TT_GT, TT_LT, TT_GTE, TT_LTE)))
 
         if res.error:
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Numbers, Identifier, '+' / '-' operators, 'not', or left parenthesis! "))
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, 
+            "Expected Numbers, Identifier, '+' / '-' operators, 'not', or left parenthesis or square brackets! "))
 
         return res.success(node)
 
@@ -788,7 +838,8 @@ class Parser:
 
         node = res.register(self.bin_op(self.comp_expr, ((TT_KEYWORD, "and"), (TT_KEYWORD, "or"))))
 
-        if res.error: return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Numbers, Identifier, Variable (var), 'if:', 'for:', 'while:', 'fn:', '+' / '-' operators, or left parenthesis! "))
+        if res.error: return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, 
+        "Expected Numbers, Identifier, Variable (var), 'if:', 'for:', 'while:', 'fn:', '+' / '-' operators, or left parenthesis or square brackets! "))
 
         return res.success(node)
 
