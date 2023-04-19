@@ -3,6 +3,7 @@
 from string_with_arrows import *
 
 import string
+import os
 
 # Constants
 
@@ -1329,7 +1330,7 @@ class BuiltInFunction(BaseFunction):
     def execute_input(self, exec_ctx):
         text = input()
         return RTResult().success(String(text))
-    execute_input.arg_names = []``
+    execute_input.arg_names = []
 
     def execute_input_int(self, exec_ctx):
         text = input()
@@ -1341,6 +1342,9 @@ class BuiltInFunction(BaseFunction):
                 print(f"'{text}' must be a whole integer!! TRY AGAIN DUMMY!!!")
             return RTResult().success(Number(text))
     execute_input.arg_names = []
+
+    def execute_clear(self, exec_ctx):
+        os.system('clear')
 
     
 
