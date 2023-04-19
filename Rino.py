@@ -933,7 +933,7 @@ class RTResult:
         self.error = None
 
     def register(self, res):
-        if res.error: self.error = res.error
+        self.error = res.error
         return res.value
     
     def success(self, value):
@@ -1206,7 +1206,7 @@ class List(Value):
             return None, Value.illegal_operation(self, other)
 
     def copy(self):
-        copy = List(self.elements[:])
+        copy = List(self.elements)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
@@ -1257,7 +1257,7 @@ class BaseFunction(Value):
         res = RTResult()
         res.register(self.check_args(arg_names, args))
         if res.error: return res
-        self.populate_args(arg_names, args)
+        self.populate_args(arg_names, args, exec_ctx)
         return res.success(None)
 
 class Function(BaseFunction):
@@ -1320,31 +1320,113 @@ class BuiltInFunction(BaseFunction):
     
     def execute_print(self, exec_ctx):
         print(str(exec_ctx.symbol_table.get('value')))
-        return RTResult.success(Number.null)
+        return RTResult().success(Number.null)
     execute_print.arg_names = ['value']
 
-    def execute_return_print(self, exec_ctx):
+    def execute_print_return(self, exec_ctx):
         return RTResult.success(String(str(exec_ctx.symbol_table.get('value'))))
-    execute_return_print.arg_names = ['value']
+    execute_print_return.arg_names = ['value']
 
-    def execute_input(self, exec_ctx):
+    def execute_to_string(self, exec_ctx):
         text = input()
         return RTResult().success(String(text))
-    execute_input.arg_names = []
+    execute_to_string.arg_names = []
 
-    def execute_input_int(self, exec_ctx):
-        text = input()
+    def execute_to_int(self, exec_ctx):
         while True:
+            text = input()
             try:
                 number = int(text)
                 break
             except ValueError:
                 print(f"'{text}' must be a whole integer!! TRY AGAIN DUMMY!!!")
             return RTResult().success(Number(text))
-    execute_input.arg_names = []
+    execute_to_int.arg_names = []
 
     def execute_clear(self, exec_ctx):
-        os.system('clear')
+        os.system('cls' if os.name == 'nt' else 'clear')
+        return RTResult.success(Number.null)
+    execute_clear.arg_names = []
+
+    def execute_is_number(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), Number)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_clear.arg_names = ['value']
+
+    def execute_is_string(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), String)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_clear.arg_names = ['value']
+
+    def execute_is_list(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), List)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_clear.arg_names = ['value']
+
+    def execute_is_function(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), BaseFunction)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_clear.arg_names = ['value']
+
+    def execute_add(self, exec_ctx):
+        list_ = exec_ctx.symbol_table.get("list")
+        value = exec_ctx.symbol_table.get("value")
+        if not isinstance(list_, List):
+            return RTResult.failure("THE FIRST THING YOU JAMMED TO INTO THE FUNCTION HAS TO BE A LIST!!!")
+
+        list_.elements.append(value)
+        return RTResult.success(Number.null)
+    
+    execute_add.arg_names = ['list', 'value']
+
+    def execute_pop(self, exec_ctx):
+        list_ = exec_ctx.symbol_table.get("list")
+        index = exec_ctx.symbol_table.get("index")
+
+        if not isinstance(list_, List):
+            return RTResult.failure("THE FIRST THING YOU JAMMED TO INTO THE FUNCTION HAS TO BE A LIST!!!")
+        
+        if not isinstance(index, Number):
+            return RTResult.failure("THE SECOND THING YOU JAMMED TO INTO THE FUNCTION HAS TO BE A NUMBER!!!")
+        
+        try:
+            element = list_.elements.pop(index.value)
+        except:
+            return RTResult.failure("THE INDEX YOU JAMMED INTO THE FUNCTION TRIES TO REMOVE A NON-EXISTENT ELEMENT, YOU DUMMY!!")
+        
+        return RTResult().success(element)
+
+    execute_pop.arg_names = ['value']
+
+    def execute_extend(self, exec_ctx):
+        listA = exec_ctx.symbol_table.get("listA")
+        listB = exec_ctx.symbol_table.get("listB")
+
+        if not isinstance(listA, List):
+            return RTResult.failure("THE FIRST THING YOU JAMMED TO INTO THE FUNCTION HAS TO BE A LIST!!!")
+        
+        if not isinstance(listB, List):
+            return RTResult.failure("THE SECOND THING YOU JAMMED TO INTO THE FUNCTION HAS TO BE A LIST!!!")
+        
+        listA.elements.extend(listB.elements)
+        return RTResult.success(Number.null)
+
+    execute_extend.arg_names = ["listA", "listB"]
+
+# constants
+
+BuiltInFunction.print               = BuiltInFunction("print")
+BuiltInFunction.print_return        = BuiltInFunction("print_return")
+BuiltInFunction.to_string           = BuiltInFunction("to_string")
+BuiltInFunction.to_int              = BuiltInFunction("to_int")
+BuiltInFunction.clear               = BuiltInFunction("clear")
+BuiltInFunction.is_number           = BuiltInFunction("is_number")
+BuiltInFunction.is_string           = BuiltInFunction("is_string")
+BuiltInFunction.is_list             = BuiltInFunction("is_list")
+BuiltInFunction.is_function         = BuiltInFunction("is_function")
+BuiltInFunction.add                 = BuiltInFunction("add")
+BuiltInFunction.remove              = BuiltInFunction("remove")
+BuiltInFunction.merge               = BuiltInFunction("merge")
 
     
 
@@ -1417,7 +1499,7 @@ class Interpreter:
         if not value:
             return res.failure(RTError(node.pos_start, node.pos_end, f"'{var_name}' has not been declared/defined (in the US constitution)! ", context))
 
-        value = value.copy().set_pos(node.pos_start, node.pos_end)
+        value = value.copy().set_pos(node.pos_start, node.pos_end).set_context(context)
         return res.success(value)
     
     def visit_VarAssignNode(self, node, context):
@@ -1575,6 +1657,7 @@ class Interpreter:
 
         return_value = res.register(value_to_call.execute(args))
         if res.error: return res
+        return_value = return_value.copy().set_pos(node.pos_start, node.pos_end).set_context(context)
         return res.success(return_value)
 
 
@@ -1586,6 +1669,19 @@ global_symbol_table.set("true", Number.true)
 global_symbol_table.set("false", Number.false)
 global_symbol_table.set("pi", Number.pi)
 global_symbol_table.set("e", Number.e)
+global_symbol_table.set("print", BuiltInFunction.print)
+global_symbol_table.set("print_return", BuiltInFunction.print_return)
+global_symbol_table.set("to_string", BuiltInFunction.to_string)
+global_symbol_table.set("to_int", BuiltInFunction.to_int)
+global_symbol_table.set("clear", BuiltInFunction.clear)
+global_symbol_table.set("cls", BuiltInFunction.clear)
+global_symbol_table.set("is_num", BuiltInFunction.is_number)
+global_symbol_table.set("is_str", BuiltInFunction.is_string)
+global_symbol_table.set("is_list", BuiltInFunction.is_list)
+global_symbol_table.set("is_fn", BuiltInFunction.is_function)
+global_symbol_table.set("add", BuiltInFunction.add)
+global_symbol_table.set("remove", BuiltInFunction.remove)
+global_symbol_table.set("merge", BuiltInFunction.merge)
 
 # RUN THE LEXER
 def run(fn, text):
