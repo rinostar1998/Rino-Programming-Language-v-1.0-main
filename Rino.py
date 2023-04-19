@@ -640,11 +640,12 @@ class Parser:
                 element_nodes.append(res.register(self.expr()))
                 if res.error: return res
 
-                if self.current_tok.type != TT_RSQUARE:
-                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected ',' or ']'!!"))
+            if self.current_tok.type != TT_RSQUARE:
+                return res.failure(InvalidSyntaxError(
+                        self.current_tok.pos_start, self.current_tok.pos_end, "Expected ',' or ']'!!"))
                 
-                res.register_advancement()
-                self.advance()
+            res.register_advancement()
+            self.advance()
 
         return res.success(ListNode(element_nodes, pos_start, self.current_tok.pos_end.copy()))
 
@@ -664,8 +665,7 @@ class Parser:
         if res.error: return res
 
         if not self.current_tok.matches(TT_KEYWORD, 'then:'):
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, 
-            self.current_tok.pos_end, "Expected Execution After Conditional Statement!!"))
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Execution After Conditional Statement!!"))
 
         res.register_advancement()
         self.advance()
@@ -1160,6 +1160,60 @@ class String(Value):
     
     def __repr__(self):
         return f'"{self.value}"'
+
+# list
+
+class List(Value):
+    def __init__(self, elements):
+        super().__init__()
+        self.elements = elements
+
+    def added_to(self, other):
+        new_list = self.copy()
+        new_list.elements.append(other)
+        return new_list, None
+
+    def subbed_by(self, other):
+        if isinstance(other, List):
+            new_list = self.copy()
+            try:
+                new_list.elements.pop(other.value)
+                return new_list, None
+            except:
+                return None, RTError(other.pos_start, other.pos_end, 
+                 "Why are you trying to remove a non-existent object that's out of bounds!?!?", self.context)
+        else:
+            return None, Value.illegal_operation(self, other)
+        
+    def dived_by(self, other):
+        if isinstance(other, List):
+            new_list = self.copy()
+            try:
+                return self.elements[other.value], None
+            except:
+                return None, RTError(other.pos_start, other.pos_end, 
+                 "Why are you trying to find a non-existent object that's out of bounds!?!?", self.context)
+        else:
+            return None, Value.illegal_operation(self, other)
+
+    def multed_by(self, other):
+        if isinstance(other, List):
+            new_list = self.copy()
+            new_list.elements.extend(other.elements)
+            return new_list, None
+        else:
+            return None, Value.illegal_operation(self, other)
+
+    def copy(self):
+        copy = List(self.elements[:])
+        copy.set_pos(self.pos_start, self.pos_end)
+        copy.set_context(self.context)
+        return copy
+    
+    def __repr__(self):
+        return f'[{", ".join([str(x) for x in self.elements])}]'
+
+
     
 # function
 
@@ -1248,7 +1302,18 @@ class Interpreter:
     def visit_StringNode(self, node, context):
         return RTResult().success(
             String(node.tok.value).set_context(context).set_pos(node.pos_start, node.pos_end))
+    
 
+    def visit_ListNode(self, node, context):
+        res = RTResult()
+        elements = []
+
+        for element_node in node.element_nodes:
+            elements.append(res.register(self.visit(element_node, context)))
+            if res.error: return res
+
+        return res.success(List(elements).set_context(context).set_pos(node.pos_start, node.pos_end))
+    
 
     
     def visit_VarAccessNode(self, node, context):
@@ -1345,6 +1410,7 @@ class Interpreter:
     
     def visit_ForNode(self, node, context):
         res = RTResult()
+        elements = []
 
         start_value = res.register(self.visit(node.start_value_node, context))
         if res.error: return res
@@ -1369,13 +1435,14 @@ class Interpreter:
             context.symbol_table.set(node.var_name_tok.value, Number(i))
             i += step_value.value
 
-            res.register(self.visit(node.body_node, context))
+            elements.append(res.register(self.visit(node.body_node, context)))
             if res.error: return res
 
-        return res.success(None)
+        return res.success(List(elements).set_context(context).set_pos(node.pos_start, node.pos_end))
     
     def visit_WhileNode(self, node, context):
         res = RTResult()
+        elements = []
 
         while True:
             condition = res.register(self.visit(node.condition_node, context))
@@ -1383,10 +1450,10 @@ class Interpreter:
 
             if not condition.is_true(): break
 
-            res.register(self.visit(node.body_node, context))
+            elements.append(res.register(self.visit(node.body_node, context)))
             if res.error: return res
 
-        return res.success(None)
+        return res.success(List(elements).set_context(context).set_pos(node.pos_start, node.pos_end))
     
     def visit_FuncDefNode(self, node, context):
         res = RTResult()
