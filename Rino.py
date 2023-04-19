@@ -1326,6 +1326,23 @@ class BuiltInFunction(BaseFunction):
         return RTResult.success(String(str(exec_ctx.symbol_table.get('value'))))
     execute_return_print.arg_names = ['value']
 
+    def execute_input(self, exec_ctx):
+        text = input()
+        return RTResult().success(String(text))
+    execute_input.arg_names = []``
+
+    def execute_input_int(self, exec_ctx):
+        text = input()
+        while True:
+            try:
+                number = int(text)
+                break
+            except ValueError:
+                print(f"'{text}' must be a whole integer!! TRY AGAIN DUMMY!!!")
+            return RTResult().success(Number(text))
+    execute_input.arg_names = []
+
+    
 
 # Context
 
