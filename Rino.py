@@ -1174,7 +1174,7 @@ class List(Value):
         return new_list, None
 
     def subbed_by(self, other):
-        if isinstance(other, List):
+        if isinstance(other, Number):
             new_list = self.copy()
             try:
                 new_list.elements.pop(other.value)
@@ -1214,35 +1214,67 @@ class List(Value):
         return f'[{", ".join([str(x) for x in self.elements])}]'
 
 
-    
+Number.null = Number(0)
+Number.dne = String('dne')
+Number.false = Number(0)
+Number.true = Number(1)
+Number.pi = Number(3.141592653589793238462643383279)
+Number.e = Number(2.7182818284590452353602874713527)
+
+
 # function
 
-class Function(Value):
-    def __init__(self, name, body_node, arg_names):
+class BaseFunction(Value):
+    def __init__(self, name):
         super().__init__()
         self.name = name or "<Mr._yummy_null_no_name!>"
+
+    def generate_new_context(self):
+        new_context = Context(self.name, self.context, self.pos_start)
+        new_context.symbol_table = SymbolTable(new_context.parent.symbol_table)
+        return new_context
+    
+    def check_args(self, arg_names, args):
+        res = RTResult()
+
+        if len(args) > len(arg_names):
+            return RTError(self.pos_start, self.pos_end, f"{len(args) - len(arg_names)}: WHY ARE YOU JAMMING RANDOM EXTRA ARGS INTO THE FUNCTION!?!? {self.name}", self.context)
+    
+        if len(args) < len(arg_names):
+            return RTError(self.pos_start, self.pos_end, f"{len(args) - len(arg_names)}: WHY ARE YOU STARVING THE FUNCTION OF IT'S DAILY YUMMY ARGS!?!? {self.name}", self.context)
+
+        return res.success(None)
+    
+    def populate_args(self, arg_names, args, exec_ctx):
+        for i in range(len(args)):
+            arg_name = arg_names[i]
+            arg_value = args[i]
+            arg_value.set_context(exec_ctx)
+            exec_ctx.symbol_table.set(arg_name, arg_value)
+
+    def check_and_populate_args(self, arg_names, args, exec_ctx):
+        res = RTResult()
+        res.register(self.check_args(arg_names, args))
+        if res.error: return res
+        self.populate_args(arg_names, args)
+        return res.success(None)
+
+class Function(BaseFunction):
+    def __init__(self, name, body_node, arg_names):
+        super().__init__(name)
+        
         self.body_node = body_node
         self.arg_names = arg_names
 
     def execute(self, args):
         res = RTResult()
         interpreter = Interpreter()
-        new_context = Context(self.name, self.context, self.pos_start)
-        new_context.symbol_table = SymbolTable(new_context.parent.symbol_table)
+        exec_ctx = self.generate_new_context()
 
-        if len(args) > len(self.arg_names):
-            return RTError(self.pos_start, self.pos_end, f"{len(args) - len(self.arg_names)}: WHY ARE YOU JAMMING RANDOM EXTRA ARGS INTO THE FUNCTION!?!? {self.name}", self.context)
-    
-        if len(args) < len(self.arg_names):
-            return RTError(self.pos_start, self.pos_end, f"{len(args) - len(self.arg_names)}: WHY ARE YOU STARVING THE FUNCTION OF IT'S DAILY YUMMY ARGS!?!? {self.name}", self.context)
+        res.register(self.check_and_populate_args(self.arg_names, args, exec_ctx))
+        if res.error: return res
 
-        for i in range(len(args)):
-            arg_name = self.arg_names[i]
-            arg_value = args[i]
-            arg_value.set_context(new_context)
-            new_context.symbol_table.set(arg_name, arg_value)
-
-        value = res.register(interpreter.visit(self.body_node, new_context))
+        value = res.register(interpreter.visit(self.body_node, exec_ctx))
         if res.error: return res
         return res.success(value)
     
@@ -1254,6 +1286,46 @@ class Function(Value):
     
     def __repr__(self):
         return f"<function {self.name}>"
+    
+class BuiltInFunction(BaseFunction):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def execute(self, args):
+        res = RTResult()
+        exec_ctx = self.generate_new_context()
+
+        method_name = f'execute_{self.name}'
+        method = getattr(self, method_name, self.no_visit_method)
+
+        res.register(self.check_and_populate_args(method.arg_names, args, exec_ctx))
+        if res.error: return res
+
+        return_value = res.register(method(exec_ctx))
+        if res.error: return res
+        return res.success(return_value)
+
+    def no_visit_method(self):
+        raise Exception(f'No execute_{self.name} method defined')
+    
+    def copy(self):
+        copy = BuiltInFunction(self.name)
+        copy.set_context(self.context)
+        copy.set_pos(self.pos_start, self.pos_end)
+        return copy
+    
+    def __repr__(self):
+        return f"<unchangable function {self.name}>"
+    
+    def execute_print(self, exec_ctx):
+        print(str(exec_ctx.symbol_table.get('value')))
+        return RTResult.success(Number.null)
+    execute_print.arg_names = ['value']
+
+    def execute_return_print(self, exec_ctx):
+        return RTResult.success(String(str(exec_ctx.symbol_table.get('value'))))
+    execute_return_print.arg_names = ['value']
+
 
 # Context
 
@@ -1487,10 +1559,12 @@ class Interpreter:
 
 
 global_symbol_table = SymbolTable()
-global_symbol_table.set("null", Number(0))
-global_symbol_table.set("dne", Number(0))
-global_symbol_table.set("true", Number(1))
-global_symbol_table.set("false", Number(0))
+global_symbol_table.set("null", Number.null)
+global_symbol_table.set("dne", Number.dne)
+global_symbol_table.set("true", Number.true)
+global_symbol_table.set("false", Number.false)
+global_symbol_table.set("pi", Number.pi)
+global_symbol_table.set("e", Number.e)
 
 # RUN THE LEXER
 def run(fn, text):
