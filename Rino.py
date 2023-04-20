@@ -1325,7 +1325,7 @@ class BuiltInFunction(BaseFunction):
     execute_print.arg_names = ['value']
 
     def execute_print_return(self, exec_ctx):
-        return RTResult.success(String(str(exec_ctx.symbol_table.get('value'))))
+        return RTResult().success(String(str(exec_ctx.symbol_table.get('value'))))
     execute_print_return.arg_names = ['value']
 
     def execute_to_string(self, exec_ctx):
@@ -1341,7 +1341,7 @@ class BuiltInFunction(BaseFunction):
                 break
             except ValueError:
                 print(f"'{text}' must be a whole integer!! TRY AGAIN DUMMY!!!")
-            return RTResult().success(Number(text))
+            return RTResult().success(Number(number))
     execute_to_int.arg_names = []
 
     def execute_clear(self, exec_ctx):
@@ -1699,5 +1699,5 @@ def run(fn, text):
     interpreter = Interpreter()
     context = Context('[Program]')
     context.symbol_table = global_symbol_table
-    result = interpreter.visit(ast.node)
+    result = interpreter.visit(ast.node, context)
     return result.value, result.error
