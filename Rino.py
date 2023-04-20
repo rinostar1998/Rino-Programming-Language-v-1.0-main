@@ -4,6 +4,7 @@ from string_with_arrows import *
 
 import string
 import os
+import math
 
 # Constants
 
@@ -1344,9 +1345,48 @@ class BuiltInFunction(BaseFunction):
     execute_input.arg_names = []
 
     def execute_clear(self, exec_ctx):
-        os.system('clear')
+        os.system('cls' if os.name == 'nt' else 'clear')
+        return RTResult.success(Number.null)
+    execute_clear.arg_names = []
+
+    def execute_is_number(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), Number)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_is_number.arg_names = ['value']
+
+    def execute_is_string(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), String)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_is_number.arg_names = ['value']
+
+    def execute_is_list(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), List)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_is_number.arg_names = ['value']
+
+    def execute_is_function(self, exec_ctx):
+        is_number = isinstance(exec_ctx.symbol_table.get("value"), BaseFunction)
+        return RTResult.success(Number.true if is_number else Number.false)
+    execute_is_number.arg_names = ['value']
+
+    def execute_append(self, exec_ctx):
+        list_ = exec_ctx.symbol_table.get("list")
+        value = exec_ctx.symbol_table.get("value")
+
+        if not isinstance(list_, value):
+            return RTResult.failure(RTResult(self.pos_start, self.pos_end, 
+            "The first thing you jammed must be a list, dummy!", exec_ctx))
+
+        list_.elements.append(value)
+        return RTResult.success(Number.null)
+
+    def execute_pop(self, exec_ctx):
+        list_ = exec_ctx.symbol_table.get("list")
+        value = exec_ctx.symbol_table.get("index")
 
     
+
+    execute_append.arg_names = ['list', 'value']
 
 # Context
 
@@ -1531,7 +1571,7 @@ class Interpreter:
             elements.append(res.register(self.visit(node.body_node, context)))
             if res.error: return res
 
-        return res.success(List(elements).set_context(context).set_pos(node.pos_start, node.pos_end))
+        return res.success(List(elements).set_context(context).set  _pos(node.pos_start, node.pos_end))
     
     def visit_WhileNode(self, node, context):
         res = RTResult()
@@ -1602,6 +1642,5 @@ def run(fn, text):
     interpreter = Interpreter()
     context = Context('[Program]')
     context.symbol_table = global_symbol_table
-    result = interpreter.visit(ast.node, context)
-
+    result = interpreter.visit(ast.n
     return result.value, result.error
