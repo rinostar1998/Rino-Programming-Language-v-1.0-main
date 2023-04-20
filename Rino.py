@@ -1699,5 +1699,5 @@ def run(fn, text):
     interpreter = Interpreter()
     context = Context('[Program]')
     context.symbol_table = global_symbol_table
-    result = interpreter.visit(ast.n
+    result = interpreter.visit(ast.node)
     return result.value, result.error
