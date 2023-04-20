@@ -72,7 +72,7 @@ class Position:
         self.col = col
         self.fn = fn
         self.ftxt = ftxt
-    
+
     def advance(self, current_char=None):
         self.idx += 1
         self.col += 1
@@ -515,7 +515,9 @@ class Parser:
     def parse(self):
         res = self.expr()
         if not res.error and self.current_tok.type != TT_EOF:
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Binary Operator! (Good look with that one!~fufufufufu!~) "))
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                "Expected Binary Operator! (Good look with that one!~fufufufufu!~) "))
         return res
     
     def power(self):
@@ -537,7 +539,9 @@ class Parser:
             else:
                 arg_nodes.append(res.register(self.expr()))
                 if res.error:
-                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Numbers, Identifier, Variable (var), '+' / '-' operators, left or right parenthesis! "))
+                    return res.failure(InvalidSyntaxError(
+                        self.current_tok.pos_start, self.current_tok.pos_end,
+                        "Expected Numbers, Identifier, Variable (var), '+' / '-' operators, left or right parenthesis! "))
 
                 while self.current_tok.type == TT_COMMA:
                     res.register_advancement()
@@ -633,7 +637,8 @@ class Parser:
         else:
             element_nodes.append(res.register(self.expr()))
             if res.error:
-                return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected Numbers, Identifier, Variable (var), '+' / '-' operators, left or right square brackets! "))
+                return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, 
+                "Expected Numbers, Identifier, Variable (var), '+' / '-' operators, left or right square brackets! "))
 
             while self.current_tok.type == TT_COMMA:
                 res.register_advancement()
@@ -912,7 +917,7 @@ class Parser:
         self.advance()
 
         if self.current_tok.type != TT_ARROW:
-                    return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected ':' leading to execution!!"))
+            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, "Expected ':' leading to execution!!"))
 
         res.register_advancement()
         self.advance()
@@ -1317,7 +1322,7 @@ class BuiltInFunction(BaseFunction):
         return copy
     
     def __repr__(self):
-        return f"<unchangable function {self.name}>"
+        return f"<built-in function {self.name}>"
     
     def execute_print(self, exec_ctx):
         print(str(exec_ctx.symbol_table.get('value')))
@@ -1328,12 +1333,12 @@ class BuiltInFunction(BaseFunction):
         return RTResult().success(String(str(exec_ctx.symbol_table.get('value'))))
     execute_print_return.arg_names = ['value']
 
-    def execute_to_string(self, exec_ctx):
+    def execute_input(self, exec_ctx):
         text = input()
         return RTResult().success(String(text))
-    execute_to_string.arg_names = []
+    execute_input.arg_names = []
 
-    def execute_to_int(self, exec_ctx):
+    def execute_input_int(self, exec_ctx):
         while True:
             text = input()
             try:
@@ -1342,7 +1347,7 @@ class BuiltInFunction(BaseFunction):
             except ValueError:
                 print(f"'{text}' must be a whole integer!! TRY AGAIN DUMMY!!!")
             return RTResult().success(Number(number))
-    execute_to_int.arg_names = []
+    execute_input_int.arg_names = []
 
     def execute_clear(self, exec_ctx):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -1380,7 +1385,7 @@ class BuiltInFunction(BaseFunction):
     
     execute_add.arg_names = ['list', 'value']
 
-    def execute_pop(self, exec_ctx):
+    def execute_remove(self, exec_ctx):
         list_ = exec_ctx.symbol_table.get("list")
         index = exec_ctx.symbol_table.get("index")
 
@@ -1397,7 +1402,7 @@ class BuiltInFunction(BaseFunction):
         
         return RTResult().success(element)
 
-    execute_pop.arg_names = ['value']
+    execute_remove.arg_names = ['value']
 
     def execute_merge(self, exec_ctx):
         listA = exec_ctx.symbol_table.get("listA")
@@ -1418,8 +1423,8 @@ class BuiltInFunction(BaseFunction):
 
 BuiltInFunction.print               = BuiltInFunction("print")
 BuiltInFunction.print_return        = BuiltInFunction("print_return")
-BuiltInFunction.to_string           = BuiltInFunction("to_string")
-BuiltInFunction.to_int              = BuiltInFunction("to_int")
+BuiltInFunction.input               = BuiltInFunction("input")
+BuiltInFunction.input_int           = BuiltInFunction("input_int")
 BuiltInFunction.clear               = BuiltInFunction("clear")
 BuiltInFunction.is_number           = BuiltInFunction("is_number")
 BuiltInFunction.is_string           = BuiltInFunction("is_string")
@@ -1672,7 +1677,7 @@ global_symbol_table.set("pi", Number.pi)
 global_symbol_table.set("e", Number.e)
 global_symbol_table.set("print", BuiltInFunction.print)
 global_symbol_table.set("print_return", BuiltInFunction.print_return)
-global_symbol_table.set("to_string", BuiltInFunction.to_string)
+global_symbol_table.set("input", BuiltInFunction.input)
 global_symbol_table.set("to_int", BuiltInFunction.to_int)
 global_symbol_table.set("clear", BuiltInFunction.clear)
 global_symbol_table.set("cls", BuiltInFunction.clear)
