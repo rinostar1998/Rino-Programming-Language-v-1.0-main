@@ -1399,7 +1399,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_pop.arg_names = ['value']
 
-    def execute_extend(self, exec_ctx):
+    def execute_merge(self, exec_ctx):
         listA = exec_ctx.symbol_table.get("listA")
         listB = exec_ctx.symbol_table.get("listB")
 
@@ -1412,7 +1412,7 @@ class BuiltInFunction(BaseFunction):
         listA.elements.extend(listB.elements)
         return RTResult.success(Number.null)
 
-    execute_extend.arg_names = ["listA", "listB"]
+    execute_merge.arg_names = ["listA", "listB"]
 
 # constants
 
@@ -1614,7 +1614,7 @@ class Interpreter:
             elements.append(res.register(self.visit(node.body_node, context)))
             if res.error: return res
 
-        return res.success(List(elements).set_context(context).set  _pos(node.pos_start, node.pos_end))
+        return res.success(List(elements).set_context(context).set_pos(node.pos_start, node.pos_end))
     
     def visit_WhileNode(self, node, context):
         res = RTResult()
