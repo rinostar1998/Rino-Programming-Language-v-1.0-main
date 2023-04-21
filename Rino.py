@@ -754,7 +754,14 @@ class Parser:
         else_case = None
 
         if not self.current_tok.matches(TT_KEYWORD, case_keyword):
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end, f"Expected '{case_keyword}', Dummy!!!"))
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end, 
+                f"Expected '{case_keyword}', Dummy!!!"))
+        else:
+            else_case = res.register(self.if_expr_c())
+            if res.error: return res
+
+        return res.success((cases, else_case))
     
     def if_expr_cases(self, case_keyword):
         res = ParseResult()
@@ -851,6 +858,18 @@ class Parser:
             if res.error: return res
         else:
             step_value = None
+
+        if self.current_tok.type == TT_NEWLINE:
+            res.register_advancement()
+            self.advance()
+
+            body = res.register(self.statements())
+            if res.error: return res
+
+            if not self.current_tok.matches(TT_KEYWORD, 'end_'):
+                return res.failure(InvalidSyntaxError(self.current_tok.pos_start,
+                                                      self.current_tok.pos_end,
+                                                      "Expected 'end_' to statement, dummy!!!"))
 
         res.register_advancement()
         self.advance()
